@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Contactos</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 250px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+            margin-left: 10px;
+        }
+
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+
+        .error {
+            color: red;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #ffebee;
+            border-left: 3px solid red;
+        }
+
+        .success {
+            color: green;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #e8f5e9;
+            border-left: 3px solid green;
+        }
+
+        .user-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 10px;
+            width: 280px;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+
+        .user-card b {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Contactos</h1>
+
+        <hr>
+
+        <h2>Crear Contacto</h2>
+        <input type="text" id="nombre" placeholder="Ingrese nombre">
+        <input type="text" id="telefono" placeholder="Ingrese número (10 dígitos)" maxlength="10">
+        <button onclick="createContactos()">Crear</button>
+        <p id="created-msg"></p>
+
+        <hr>
+
+        <h2>Buscar Contacto</h2>
+        <input type="number" id="contactoId" placeholder="Ingrese ID" min="1">
+        <button onclick="getContacto()">Buscar</button>
+        <div id="contacto-result"></div>
+
+        <hr>
+
+        <h2>Listar Contactos</h2>
+        <button onclick="loadContactos()">Cargar Contactos</button>
+        <div id="contact-list"></div>
+
+        <hr>
+
+        <h2>Eliminar Contacto</h2>
+        <input type="number" id="deleteId" placeholder="Ingrese ID del contacto a eliminar" min="1">
+        <button onclick="deleteContacto()">Eliminar</button>
+        <p id="delete-msg"></p>
+    </div>
+
+    <script>
+        /**
+         * FUNCIÓN 1: Crear un nuevo contacto
+         * 
+         * Esta función:
+         * 1. Obtiene los valores de los campos nombre y teléfono
+         * 2. Valida que ambos campos estén completos
+         * 3. Envía una petición POST al servidor con los datos
+         * 4. Muestra un mensaje de éxito o error según la respuesta
+         */
+        async function createContactos(){
+            // Obtener los valores ingresados por el usuario
+            const nombre = document.getElementById("nombre").value;
+            const telefono = document.getElementById("telefono").value;
+            // Obtener el elemento donde mostraremos los mensajes
+            const msg = document.getElementById("created-msg");
+
+            // Limpiar cualquier mensaje anterior
+            msg.innerText = "";
+
+            // Validar que ambos campos estén completos
+            if(!nombre || !telefono){
+                msg.innerHTML = "<span class='error'>Por favor, completa todos los campos</span>";
+                return; // Detener la ejecución si falta algún campo
+            }
+
+            // Enviar petición POST al servidor para crear el contacto
+            const response = await fetch("/contactos", {
+                method: "POST", // Método HTTP POST para crear recursos
+                headers: { "Content-Type": "application/json" }, // Indicar que enviamos JSON
+                body: JSON.stringify({nombre, telefono}) // Convertir objeto a JSON
+            });
+
+            // Verificar si la respuesta del servidor indica un error
+            if (!response.ok) {
+                // Intentar obtener el mensaje de error del servidor
+                const data = await response.json();
+                let errorMessage = "Error desconocido";
+                if (data.errors) {
+                    // Si hay errores de validación, mostrarlos todos
+                    const errorMessages = Object.values(data.errors).join(", ");
+                    errorMessage = "Error de validación: " + errorMessages;
+                } else {
+                    // Usar el mensaje de error proporcionado por el servidor
+                    errorMessage = data.message || data.error || "Error al crear el contacto";
+                }
+                // Mostrar el mensaje de error al usuario
+                msg.innerHTML = "<span class='error'>" + errorMessage + "</span>";
+                return;
+            }
+
+            // Si todo salió bien, obtener los datos del contacto creado
+            const data = await response.json();
+            // Mostrar mensaje de éxito con el ID del contacto creado
+            msg.innerHTML = "<span class='success'>Contacto creado con ID " + data.id + "</span>";
+            // Limpiar los campos del formulario
+            document.getElementById("nombre").value = "";
+            document.getElementById("telefono").value = "";
+        }
+
+        /**
+         * FUNCIÓN 2: Buscar un contacto por su ID
+         * 
+         * Esta función:
+         * 1. Obtiene el ID ingresado por el usuario
+         * 2. Valida que se haya ingresado un ID
+         * 3. Envía una petición GET al servidor para obtener el contacto
+         * 4. Muestra la información del contacto o un mensaje de error
+         */
+        async function getContacto() {
+            // Obtener el ID ingresado por el usuario
+            const id = document.getElementById("contactoId").value;
+            // Obtener el contenedor donde mostraremos el resultado
+            const container = document.getElementById("contacto-result");
+            // Limpiar cualquier contenido anterior
+            container.innerHTML = "";
+
+            // Validar que se haya ingresado un ID
+            if (!id) {
+                container.innerHTML = "<p class='error'>Por favor, ingresa un ID</p>";
+                return; // Detener la ejecución si no hay ID
+            }
+
+            // Enviar petición GET al servidor para obtener el contacto
+            const response = await fetch("/contactos/" + id);
+
+            // Verificar si la respuesta indica un error (por ejemplo, contacto no encontrado)
+            if (!response.ok) {
+                // Intentar obtener el mensaje de error del servidor
+                const data = await response.json();
+                const errorMessage = data.Error || data.error || "Contacto no encontrado";
+                // Mostrar el mensaje de error
+                container.innerHTML = "<p class='error'>" + errorMessage + "</p>";
+                return;
+            }
+
+            // Si todo salió bien, obtener los datos del contacto
+            const data = await response.json();
+            // Mostrar la información del contacto en una tarjeta
+            container.innerHTML = `
+                <div class="user-card">
+                    <b>ID:</b> ${data.id}<br>
+                    <b>Nombre:</b> ${data.nombre}<br>
+                    <b>Teléfono:</b> ${data.telefono}
+                </div>
+            `;
+        }
+
+        /**
+         * FUNCIÓN 3: Cargar y mostrar todos los contactos
+         * 
+         * Esta función:
+         * 1. Envía una petición GET al servidor para obtener todos los contactos
+         * 2. Verifica que la respuesta sea una lista válida
+         * 3. Muestra cada contacto en una tarjeta con un botón para eliminarlo
+         */
+        async function loadContactos() {
+            // Obtener el contenedor donde mostraremos la lista
+            const container = document.getElementById("contact-list");
+            // Mostrar mensaje de carga mientras se obtienen los datos
+            container.innerHTML = "<p>Cargando...</p>";
+
+            // Enviar petición GET al servidor para obtener todos los contactos
+            const response = await fetch("/contactos");
+
+            // Verificar si la respuesta indica un error
+            if (!response.ok) {
+                // Intentar obtener el mensaje de error del servidor
+                const data = await response.json();
+                const errorMessage = data.error || data.message || "Error al cargar los contactos";
+                // Mostrar el mensaje de error
+                container.innerHTML = "<p class='error'>" + errorMessage + "</p>";
+                return;
+            }
+
+            // Obtener la lista de contactos de la respuesta
+            const contactos = await response.json();
+
+            // Validar que la respuesta sea un array (lista)
+            if (!Array.isArray(contactos)) {
+                container.innerHTML = "<p class='error'>Error: La respuesta no es una lista válida</p>";
+                return;
+            }
+
+            // Si no hay contactos, mostrar un mensaje
+            if (contactos.length === 0) {
+                container.innerHTML = "<p>No hay contactos registrados</p>";
+                return;
+            }
+
+            // Limpiar el contenedor antes de agregar los contactos
+            container.innerHTML = "";
+            // Recorrer cada contacto y crear una tarjeta para mostrarlo
+            contactos.forEach(contacto => {
+                container.innerHTML += `
+                    <div class="user-card">
+                        <b>ID:</b> ${contacto.id}<br>
+                        <b>Nombre:</b> ${contacto.nombre}<br>
+                        <b>Teléfono:</b> ${contacto.telefono}
+                        <button class="delete-btn" onclick="deleteContactoById(${contacto.id})">Eliminar</button>
+                    </div>
+                `;
+            });
+        }
+
+        /**
+         * FUNCIÓN 4: Eliminar un contacto ingresando su ID manualmente
+         * 
+         * Esta función:
+         * 1. Obtiene el ID ingresado por el usuario
+         * 2. Valida que se haya ingresado un ID
+         * 3. Envía una petición DELETE al servidor
+         * 4. Muestra un mensaje de éxito o error
+         * 5. Recarga la lista de contactos si la eliminación fue exitosa
+         */
+        async function deleteContacto() {
+            // Obtener el ID ingresado por el usuario
+            const id = document.getElementById("deleteId").value;
+            // Obtener el elemento donde mostraremos los mensajes
+            const msg = document.getElementById("delete-msg");
+            // Limpiar cualquier mensaje anterior
+            msg.innerHTML = "";
+
+            // Validar que se haya ingresado un ID
+            if (!id) {
+                msg.innerHTML = "<span class='error'>Por favor, ingresa un ID</span>";
+                return; // Detener la ejecución si no hay ID
+            }
+
+            // Enviar petición DELETE al servidor para eliminar el contacto
+            const response = await fetch("/contactos/" + id, {
+                method: "DELETE" // Método HTTP DELETE para eliminar recursos
+            });
+
+            // Verificar si la respuesta indica un error
+            if (!response.ok) {
+                // Intentar obtener el mensaje de error del servidor
+                const data = await response.json();
+                const errorMessage = data.error || data.Error || "Error al eliminar el contacto";
+                // Mostrar el mensaje de error
+                msg.innerHTML = "<span class='error'>" + errorMessage + "</span>";
+            } else {
+                // Si todo salió bien, obtener el mensaje de éxito
+                const data = await response.json();
+                const successMessage = data.message || "Contacto eliminado exitosamente";
+                // Mostrar mensaje de éxito
+                msg.innerHTML = "<span class='success'> " + successMessage + "</span>";
+                // Limpiar el campo de entrada
+                document.getElementById("deleteId").value = "";
+                // Recargar la lista de contactos para reflejar los cambios
+                loadContactos();
+            }
+        }
+
+        /**
+         * FUNCIÓN 5: Eliminar un contacto haciendo clic en el botón de su tarjeta
+         * 
+         * Esta función:
+         * 1. Muestra una confirmación al usuario
+         * 2. Si confirma, envía una petición DELETE al servidor
+         * 3. Muestra un mensaje de éxito o error
+         * 4. Recarga la lista de contactos si la eliminación fue exitosa
+         * 
+         * @param {number} id - El ID del contacto a eliminar
+         */
+        async function deleteContactoById(id) {
+            // Mostrar un diálogo de confirmación antes de eliminar
+            if (!confirm("¿Estas seguro de que deseas eliminar este contacto?")) {
+                return; // Si el usuario cancela, no hacer nada
+            }
+
+            // Enviar petición DELETE al servidor para eliminar el contacto
+            const response = await fetch("/contactos/" + id, {
+                method: "DELETE" // Método HTTP DELETE para eliminar recursos
+            });
+
+            // Verificar si la respuesta indica un error
+            if (!response.ok) {
+                // Intentar obtener el mensaje de error del servidor
+                const data = await response.json();
+                const errorMessage = data.error || data.Error || "No se pudo eliminar el contacto";
+                // Mostrar el mensaje de error en un alert
+                alert("Error: " + errorMessage);
+            } else {
+                // Si todo salió bien, obtener el mensaje de éxito
+                const data = await response.json();
+                const successMessage = data.message || "Contacto eliminado exitosamente";
+                // Mostrar mensaje de éxito en un alert
+                alert(successMessage);
+                // Recargar la lista de contactos para reflejar los cambios
+                loadContactos();
+            }
+        }
+    </script>
+</body>
+</html>
