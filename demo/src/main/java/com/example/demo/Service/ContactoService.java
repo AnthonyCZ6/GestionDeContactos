@@ -14,7 +14,7 @@ public class ContactoService {
     private final AtomicLong idGenerador =new AtomicLong(1);
 
     public ContactoService(){
-        save(new CreateContactosDTO("Tony","7777777777"));
+//        save(new CreateContactosDTO("Tony","7777777777"));
     }
 
     public Contactos save(CreateContactosDTO dto){
@@ -28,7 +28,7 @@ public class ContactoService {
         return Optional.ofNullable(alamacenamiento.get(id));
     }
 
-    public List<Contactos> findAll(int page, int size, String busqueda){
+    public List<Contactos> findAll(String busqueda){
         List<Contactos> all = new ArrayList<>(alamacenamiento.values());
 
         if(busqueda != null && !busqueda.isBlank()){
@@ -38,11 +38,7 @@ public class ContactoService {
                     .collect(Collectors.toList());
         }
 
-        int from = page *size;
-        if(from >= all.size()) return Collections.emptyList();
-
-        int to = Math.min(from + size, all.size());
-        return all.subList(from,to);
+        return all;
     }
 
     public Optional <Contactos> update(Long id, CreateContactosDTO dto) {

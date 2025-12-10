@@ -1,6 +1,5 @@
 package com.example.demo.Controller;
 
-
 import com.example.demo.DTO.CreateContactosDTO;
 import com.example.demo.Model.Contactos;
 import com.example.demo.Service.ContactoService;
@@ -31,12 +30,9 @@ public class ContactosController {
 
     @GetMapping
     public List<Contactos> list(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size,
         @RequestParam(required = false) String busqueda
-
     ){
-        return service.findAll(page,size,busqueda);
+        return service.findAll(busqueda);
     }
 
     @PostMapping
